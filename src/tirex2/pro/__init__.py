@@ -5,6 +5,7 @@ forecasting, time-series classification and regression, and hardware-optimized
 inference helpers.
 """
 
+from .anomaly import AnomalyResult, TimeSeriesAnomalyDetector
 from .classification import TimeSeriesClassifier
 from .finetuning import FineTuner
 from .hardware import HardwareOptimizer
@@ -16,5 +17,7 @@ __all__ = [
     "IncrementalForecaster",
     "TimeSeriesClassifier",
     "TimeSeriesRegressor",
+    "TimeSeriesAnomalyDetector",
+    "AnomalyResult",
     "HardwareOptimizer",
 ]
