@@ -6,9 +6,10 @@
 ## Open / In Progress
 
 - **[IN_PROGRESS]** Decide next TiRex Pro feature to implement
-  - The core uv migration, training/fine-tuning hardening, and Pro skeleton contracts are in place.
-  - Streaming feature is implemented as a rolling-window forecaster.
-  - Remaining roadmap items: classification head, regression head, hardware compile/quantize backends.
+  - Core uv migration, training/fine-tuning hardening, and several Pro skeletons are implemented.
+  - Streaming feature implemented as rolling-window forecaster.
+  - Regression head implemented with frozen backbone + MLP head.
+  - Remaining roadmap items: classification head, hardware compile/quantize backends.
 
 ## Pending / Needs Definition
 
@@ -67,7 +68,12 @@
   - Accepts raw `TiRex2` or `ForecastModel`; wraps raw backbone in `ForecastModel` internally.
   - Supports target + past/future covariates, truncates to `context_length`.
   - Updated `test/test_pro_skeletons.py` with 4 streaming-specific tests.
-  - `make test` now passes 104 tests; `make lint` clean.
+  - `make test` passes 104 tests; `make lint` clean.
+- **[CLOSED]** Implement TiRex Pro regression head (2026-08-03)
+  - Added `TiRex2.forward_features()` to expose normalized stack output for downstream heads.
+  - Implemented `TimeSeriesRegressor` with a frozen-backbone MLP head, mean-pooled target features, masked MSE loss.
+  - Supports `fit`, `predict`, `save_head`, `load_head`; added 3 regression tests.
+  - `make test` passes 105+ tests; `make lint` clean. One pre-existing flaky GPU-only flex-attention timing test occasionally fails.
 
 ---
 
@@ -77,4 +83,5 @@
 - **2026-08-03 mid-session:** Training/fine-tuning hardening: fixed default config mismatch, added dataset validation, verified CLI smoke test and full `pytest test/` pass.
 - **2026-08-03 end-session:** Packaging sanity and `make test` fixed. Fork created at `hysebsch/tirex-2`; both commits pushed. Pro skeletons hardened with tests. `make test` passes 101 tests; `make lint` clean.
 - **2026-08-03 streaming session:** Implemented `IncrementalForecaster` rolling-window streaming feature. `make test` passes 104 tests; pushed to fork.
+- **2026-08-03 regression session:** Implemented `TimeSeriesRegressor`. `make test` passes 105+ tests; pushed to fork. Note: pre-existing flaky GPU-only flex-attention timing test may fail intermittently.
 - **Important constraints from `CLAUDE.md`:** CUDA 12.8 torch on NVIDIA; DGX Spark CUDA 13.0 driver is backward-compatible via local toolkit; do not commit `model/`, `output/`, `.venv/`, `__pycache__/`, `*.csv`, `.pixi/`, `*.egg-info`; use `uv`, not Pixi.
