@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from tirex2 import TimeseriesType
 from tirex2.pro.classification import TimeSeriesClassifier
 from tirex2.pro.hardware import HardwareInfo, HardwareOptimizer, detect_hardware, print_hardware_report
 from tirex2.pro.regression import TimeSeriesRegressor
@@ -72,17 +73,77 @@ def test_hardware_optimizer_quantize_not_implemented(build_small_model) -> None:
         optimizer.quantize()
 
 
-def test_incremental_forecaster_not_implemented(build_small_model) -> None:
-    model = build_small_model("cpu")
-    forecaster = IncrementalForecaster(model, prediction_length=4)
-    from tirex2 import TimeseriesType
-    ts = TimeseriesType(target=torch.randn(1, 16), past_covariates=None, future_covariates=None)
-    with pytest.raises(NotImplementedError, match="Streaming update"):
-        forecaster.update(ts)
-    with pytest.raises(NotImplementedError, match="Streaming forecast"):
-        forecaster.forecast()
+def test_incremental_forecaster_rolling_window(build_small_model) -> None:
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    pred_len = model.future_len
+
+    forecaster = IncrementalForecaster(model, prediction_length=pred_len)
+    assert forecaster.context_length == context_len
+
+    # Seed with a context that exceeds the model limit.
+    full_history = TimeseriesType(
+        target=torch.randn(1, context_len + 20),
+        past_covariates=None,
+        future_covariates=torch.zeros(1, context_len + 20 + pred_len),
+    )
+    forecaster.update(full_history)
+    assert forecaster._cached is not None
+    assert forecaster._cached.target.shape[-1] == context_len
+    assert forecaster._cached.future_covariates is not None
+
+    forecast1 = forecaster.forecast()
+    assert isinstance(forecast1, torch.Tensor)
+    assert forecast1.shape == (1, model.num_quantiles, pred_len)
+
+    # Add a single new observation.
+    new_step = TimeseriesType(
+        target=torch.randn(1, 1),
+        past_covariates=None,
+        future_covariates=torch.zeros(1, 1 + pred_len),
+    )
+    forecaster.update(new_step)
+    assert forecaster._cached.target.shape[-1] == context_len
+    assert forecaster._last_forecast is None  # invalidated by update
+
+    forecast2 = forecaster.forecast()
+    assert isinstance(forecast2, torch.Tensor)
+    assert forecast2.shape == (1, model.num_quantiles, pred_len)
+
     forecaster.reset()
-    assert forecaster._state is None
+    assert forecaster._cached is None
+    with pytest.raises(RuntimeError, match="No context has been ingested"):
+        forecaster.forecast()
+
+
+def test_incremental_forecaster_with_past_covariates(build_small_model) -> None:
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    pred_len = model.future_len
+
+    forecaster = IncrementalForecaster(model, prediction_length=pred_len, context_length=context_len)
+    ts = TimeseriesType(
+        target=torch.randn(1, context_len),
+        past_covariates=torch.randn(2, context_len),
+        future_covariates=None,
+    )
+    forecaster.update(ts)
+    assert forecaster._cached.past_covariates is not None
+    assert forecaster._cached.past_covariates.shape[-1] == context_len
+
+    forecast = forecaster.forecast()
+    assert isinstance(forecast, torch.Tensor)
+
+
+def test_incremental_forecaster_invalid_prediction_length(build_small_model) -> None:
+    with pytest.raises(ValueError, match="prediction_length must be >= 1"):
+        IncrementalForecaster(build_small_model("cpu"), prediction_length=0)
+
+
+def test_incremental_forecaster_update_requires_timeseries_type(build_small_model) -> None:
+    forecaster = IncrementalForecaster(build_small_model("cpu"), prediction_length=4)
+    with pytest.raises(TypeError, match="TimeseriesType"):
+        forecaster.update(torch.randn(1, 8))
 
 
 def test_time_series_classifier_not_implemented(build_small_model) -> None:
