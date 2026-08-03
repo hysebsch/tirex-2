@@ -8,8 +8,7 @@ benchmark.
 Download the GiftEval datasets once:
 
 ```bash
-
-pixi run -e example-cu128 huggingface-cli download Salesforce/GiftEval --repo-type=dataset --local-dir PATH_TO_SAVE
+uv run huggingface-cli download Salesforce/GiftEval --repo-type=dataset --local-dir PATH_TO_SAVE
 ```
 
 ## Run
@@ -17,7 +16,14 @@ pixi run -e example-cu128 huggingface-cli download Salesforce/GiftEval --repo-ty
 Script (required positional arguments: the GiftEval storage directory and model type):
 
 ```bash
-pixi run -e example-cu128 python examples/gifteval/run_gifteval.py </path/to/gifteval_storage> pretrained
+make gifteval ARGS="</path/to/gifteval_storage> pretrained"
+```
+
+Or directly with uv:
+
+```bash
+PYTHONPATH=examples/gifteval:$PYTHONPATH uv run python examples/gifteval/run_gifteval.py \
+  </path/to/gifteval_storage> pretrained
 ```
 
 Model type options:
@@ -47,7 +53,7 @@ official leaderboard numbers but never exercises the model's cross-variate path.
 
 ```bash
 # univariate scoring (matches the public GIFT-Eval leaderboard protocol)
-pixi run -e example-cu126 python examples/gifteval/run_gifteval.py \
+PYTHONPATH=examples/gifteval:$PYTHONPATH uv run python examples/gifteval/run_gifteval.py \
     </path/to/gifteval_storage> <ckpt_dir> --eval-mode univariate
 ```
 
@@ -56,7 +62,9 @@ leaderboard, since the leaderboard baselines are computed in univariate mode —
 `--eval-mode univariate` for a leaderboard-comparable run.
 
 To run GIFT-Eval in an interactive manner, start jupyter lab
+
 ```bash
-pixi run notebook
+make notebook
 ```
+
 and then open `./examples/gifteval/gifteval.ipynb`.

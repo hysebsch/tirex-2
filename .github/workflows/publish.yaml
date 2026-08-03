@@ -1,4 +1,4 @@
-# From https://docs.github.com/en/actions/tutorials/build-and-test-code/python#publishing-to-pypi
+# From https://docs.pypi.org/trusted-publishers/
 
 name: Publish Python Package
 
@@ -15,20 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: prefix-dev/setup-pixi@v0.9.6
+      - uses: astral-sh/setup-uv@v5
         with:
-          environments: pypi-build
-          frozen: true
+          version: "0.11.0"
 
       - name: Build release distributions
-        run: pixi run -e pypi-build python -m build
+        run: uv build
 
       - name: Upload distributions
         uses: actions/upload-artifact@v7
         with:
           name: release-dists
           path: dist/
-
 
   pypi-publish:
     runs-on: ubuntu-latest

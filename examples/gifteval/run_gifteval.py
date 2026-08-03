@@ -4,9 +4,10 @@ Usage
 -----
 ::
 
-    pixi run gifteval GIFT_EVAL_STORE MODEL_TYPE [--out RESULTS.csv]
+    make gifteval ARGS="GIFT_EVAL_STORE MODEL_TYPE [--out RESULTS.csv]"
 
-The ``gifteval`` task sets ``PYTHONPATH=src`` so the ``tirex`` package resolves.
+The Makefile sets ``PYTHONPATH=examples/gifteval`` so the local ``gift_eval_utils``
+module resolves.
 
 The first positional argument is the path to the local GiftEval storage
 directory (the one downloaded via ``huggingface-cli download Salesforce/GiftEval``).

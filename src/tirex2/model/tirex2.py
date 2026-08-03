@@ -143,6 +143,32 @@ class TiRex2(nn.Module):
         matmul_precision: MatmulPrecision | None = None,
         **kwargs,
     ) -> None:
+        # Store the exact constructor kwargs so training checkpoints can be
+        # saved in the same format that ``load_model`` reads.
+        init_kwargs = dict(
+            stack_config=stack_config,
+            num_blocks=num_blocks,
+            embedding_dim=embedding_dim,
+            input_patch_size=input_patch_size,
+            output_patch_size=output_patch_size,
+            quantiles=list(quantiles),
+            tokenizer_cfg=tokenizer_cfg,
+            scaler_cfg=scaler_cfg,
+            h_expand=h_expand,
+            context_len=context_len,
+            future_len=future_len,
+            input_ff_dim=input_ff_dim,
+            act_func=act_func,
+            dropout=dropout,
+            use_qk_norm=use_qk_norm,
+            stack_out_norm_config=stack_out_norm_config,
+            tta_sign_flip=tta_sign_flip,
+            tta_diff=tta_diff,
+            device=device,
+            matmul_precision=matmul_precision,
+        )
+        init_kwargs.update(kwargs)
+
         if matmul_precision is not None:
             torch.set_float32_matmul_precision(matmul_precision)
 
@@ -151,6 +177,7 @@ class TiRex2(nn.Module):
         # toggled exclusively via ``tta_diff``.
         kwargs.pop("postprocessor_cfg", None)
         super().__init__(*args, **kwargs)
+        self._init_kwargs = init_kwargs
         act_func = _resolve_act_func(act_func)
         self.device = _normalize_device(device)
         self.postprocessor = PostProcessor()

@@ -22,14 +22,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install --upgrade uv && \
+    uv pip install --python /opt/venv/bin/python --no-cache-dir torch==2.9.1+cu128 --index-url https://download.pytorch.org/whl/cu128
 
 # WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --python /opt/venv/bin/python --no-cache-dir -r requirements.txt
 
 # Remove pythoch cache and test folders
-RUN find /opt/venv/lib/python3.12/site-packages -type d \
+RUN find /opt/venv/lib/python*/site-packages -type d \
         \( -name '__pycache__' -o -name tests -o -name test \) -prune -exec rm -rf {} +
 
 # Remove packagesd, which are not used. Still to be tested

@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: prefix-dev/setup-pixi@v0.9.6
+      - uses: astral-sh/setup-uv@v5
         with:
-          environments: test-cpu
-          frozen: true
+          version: "0.11.0"
+
+      - name: Install project (CPU)
+        run: make install-cpu
 
       - name: Run tests on CPU
-        run: pixi run -e test-cpu test
+        run: make test
 
   core-tests-pip:
     name: core-tests (py${{ matrix.python-version }}, ${{ matrix.os }})

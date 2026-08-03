@@ -57,19 +57,36 @@ pip install "tirex-2[examples,fev,gluonts]"
 
 The Python package installation is currently only tested on Linux and macOS. Docker usage is documented separately and includes Linux, macOS, and Windows Docker Desktop instructions.
 
-### Via Pixi
-We use [Pixi](https://pixi.prefix.dev/latest/) for our development and benchmarking environment to ensure that it is set up correctly. Run the following command to install it on your machine:
+### Development setup with uv
+
+We use [uv](https://docs.astral.sh/uv/) for development. Install uv, then run:
+
 ```bash
-curl -fsSL https://pixi.sh/install.sh | sh
+make install        # auto-detects GPU and installs the right torch variant
+make test           # run the test suite
+```
+
+On a CUDA-capable machine this installs PyTorch built with CUDA 12.8 (`cu128`), which is the version the upstream xlstm/FlashRNN CUDA extensions are tested against. If you are on a DGX Spark or similar machine with a CUDA 13.0 driver, the Makefile will download a local CUDA 12.8 toolkit so the extensions can be compiled against the matching CUDA version (CUDA 13 drivers are backward compatible with CUDA 12.8 binaries).
+
+Common Makefile targets:
+
+```bash
+make minimal        # sine-wave smoke example
+make comparison     # covariate demo
+make fevbench       # fev-bench runner
+make gifteval       # GiftEval runner
+make notebook       # launch Jupyter Lab
+make lint           # ruff check
+make format         # ruff format
 ```
 
 ## Getting started
 
-The most easy way for you to get started is by checking out our ["Getting Started" notebook](examples/getting_started.ipynb). Moreover, you can jump straight into testing out TiRex using [Google Colab](https://colab.research.google.com/github/NX-AI/tirex-2/blob/main/examples/getting_started.ipynb). If you have cloned this repository, you can also easily start the notebook via Pixi by running:
+The most easy way for you to get started is by checking out our ["Getting Started" notebook](examples/getting_started.ipynb). Moreover, you can jump straight into testing out TiRex using [Google Colab](https://colab.research.google.com/github/NX-AI/tirex-2/blob/main/examples/getting_started.ipynb). If you have cloned this repository, start the notebook with:
+
 ```bash
-pixi run notebook
+make notebook
 ```
-Note that for `pixi`, depending on your CUDA version and use-case, you may need to use another environment, e.g., `-e example-cu128`, that are defined in [pyproject.toml](pyproject.toml) under section `tool.pixi.environments`.
 
 ### Minimal usage predicting a simple sine wave
 ```python
@@ -129,6 +146,40 @@ To reproduce our results for the [GIFT-Eval](https://huggingface.co/spaces/Sales
 ## TiRex Docker image
 
 For detailed instructions on building and running TiRex-2 in a Docker container, see the [Docker README](./inference/README.md).
+
+## Training and fine-tuning
+
+This repository includes experimental training and fine-tuning support under `tirex2.pro`:
+
+```python
+from tirex2.pro.finetuning import FineTuner
+
+fine_tuner = FineTuner(model, strategy="head-only")  # or "full", "blocks", "lora"
+fine_tuner.fit(
+    train_data,           # list of TimeseriesType or TiRexDataset
+    val_data=None,
+    epochs=10,
+    batch_size=8,
+    learning_rate=1e-4,
+    output_dir="./checkpoints",
+)
+fine_tuner.save("./fine_tuned_model")
+```
+
+Strategies:
+
+- `full` — update all model parameters.
+- `head-only` — freeze the multivariate stack and train the input/output embeddings (fastest, recommended for domain adaptation).
+- `blocks` — train only selected stack blocks, e.g. `strategy_kwargs={"blocks_to_train": [10, 11]}`.
+- `lora` — inject low-rank adapters into the variate-mixer attention and train only the adapter weights.
+
+The training objective is the pinball (quantile) loss from the paper, applied at every observed output time step. A `SyntheticCouplingPipeline` can generate multivariate training samples from a pool of univariate series, mirroring the data-augmentation approach described in Section 3.4.
+
+A command-line training script is available:
+
+```bash
+python scripts/train.py --config configs/finetune.yaml --ckpt NX-AI/TiRex-2 --out ./checkpoints
+```
 
 ## TiRex-2 Pro
 TiRex-2 already provides state-of-the-art performance for zero-shot prediction, so you can use this open-source release without training on your own data.

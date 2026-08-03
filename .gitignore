@@ -1,26 +1,44 @@
-# pixi environments
-.pixi/*
-!.pixi/config.toml
+# pixi (legacy)
+.pixi/
+pixi.lock
 
+# uv / Python environments
+.venv/
+venv/
+
+# Python-generated files
 **/__pycache__/
-output/
-**/output/
-.zed/
-*.egg-info
-/model/
-*.csv
+*.py[oc]
 build/
 dist/
+wheels/
+*.egg-info
 
-.ipynb_checkpoints/
+# IDE
+.zed/
 .idea/
+.vscode/
 
-test/*
-!test/test_postprocessor_instantiation.py
-!test/test_tirex2_instantiation.py
-!test/test_api_adapter.py
-!test/test_forecast_model.py
-!test/test_fev_adapter.py
-!test/test_references.py
-!test/references/
-/venv
+# Project outputs
+output/
+**/output/
+*.csv
+
+# Local model checkpoint
+/model/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test artifacts
+.pytest_cache/
+.ruff_cache/
+
+# uv lock file is intentionally not tracked because torch is installed
+# via requirements/torch-*.txt depending on the target hardware.
+uv.lock
+
+# Workspace artifacts from flattening
+.git.outer.bak
+paper/
+PLAN.md

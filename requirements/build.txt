@@ -1,0 +1,4 @@
+# Build-time tools for source-compiled CUDA extensions (FlashRNN/xLSTM).
+# System compilers and the CUDA toolkit are handled by scripts/setup_hardware.py.
+ninja
+cmake

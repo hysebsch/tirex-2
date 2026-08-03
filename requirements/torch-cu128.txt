@@ -1,0 +1,6 @@
+# PyTorch CUDA 12.8 wheel.
+# Use this on the DGX Spark (CUDA 13.0 driver) because xlstm/FlashRNN's JIT CUDA
+# extensions are tested against CUDA 12.8. The CUDA 13.0 driver is backward
+# compatible with CUDA 12.8 binaries.
+--index-url https://download.pytorch.org/whl/cu128
+torch==2.9.1+cu128

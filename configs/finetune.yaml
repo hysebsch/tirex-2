@@ -1,0 +1,29 @@
+checkpoint: NX-AI/TiRex-2
+device: cpu
+
+# Generate synthetic multivariate training data from random univariate series.
+# To use real data, pass --data /path/to/dir with .pt TimeseriesType files.
+synthetic_data:
+  num_samples: 256
+  num_variates: 4
+  # window_length must be >= context_length + prediction_length. The default
+  # pretrained model has future_len=320, so 576 = 256 + 320 works out of the box.
+  window_length: 576
+
+strategy: head-only
+strategy_kwargs: {}
+
+epochs: 5
+batch_size: 4
+learning_rate: 0.0001
+weight_decay: 0.01
+grad_clip: 1.0
+warmup_ratio: 0.1
+early_stopping_patience: 2
+
+# Fine-tuning windowing. If omitted, context_length is derived from the data.
+context_length: 256
+prediction_length: 320
+
+output_dir: ./checkpoints/finetuned
+log_interval: 5
