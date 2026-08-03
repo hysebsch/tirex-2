@@ -5,15 +5,10 @@
 
 ## Open / In Progress
 
-- **[IN_PROGRESS]** Decide next TiRex Pro feature to implement
-  - Core uv migration, training/fine-tuning hardening, and several Pro skeletons are implemented.
-  - Streaming feature implemented as rolling-window forecaster.
-  - Regression head implemented with frozen backbone + MLP head.
-  - Anomaly detector implemented using forecast-deviation scoring.
-  - Remaining roadmap items: classification head, hardware compile/quantize backends.
-
-## Pending / Needs Definition
-
+- **[OPEN]** Implement `TimeSeriesClassifier` in `src/tirex2/pro/classification/classifier.py`.
+  - Skeleton exists but only has a stub method; needs a working frozen-backbone classifier head and tests.
+- **[OPEN]** Implement `HardwareOptimizer.compile()` / `quantize()` backends in `src/tirex2/pro/hardware/`.
+  - Current methods raise `NotImplementedError`; decide whether to wrap `torch.compile`, `torch.quantization`, or an ONNX path.
 - **[OPEN]** Open a pull request from `hysebsch/tirex-2:main` back to `NX-AI/tirex-2:main` when ready.
 - **[OPEN]** Validate `make install-cuda` on DGX Spark with CUDA 13.0 driver (currently validated only on CPU / no GPU path).
 
@@ -81,6 +76,10 @@
   - Threshold calibration via percentile or contamination rate on reference data.
   - Exported from `tirex2.pro`; added `test/test_anomaly.py` with synthetic anomaly tests.
   - `make test` passes 111 tests; `make lint` clean.
+- **[CLOSED]** Create Pro features demonstration notebook (2026-08-03)
+  - Added `examples/pro_features.ipynb` with CPU-friendly walkthroughs for streaming forecasting, regression head, and anomaly detection.
+  - Matches the style of `examples/getting_started.ipynb`; uses matplotlib for static, CI-friendly plots.
+  - Notebook validated with `nbformat.validate` and syntax-checked; Pro tests still pass.
 
 ---
 
