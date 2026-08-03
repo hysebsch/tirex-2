@@ -7,7 +7,8 @@
 
 - **[IN_PROGRESS]** Decide next TiRex Pro feature to implement
   - The core uv migration, training/fine-tuning hardening, and Pro skeleton contracts are in place.
-  - Remaining roadmap items: full streaming state caching, classification head, regression head, hardware compile/quantize backends.
+  - Streaming feature is implemented as a rolling-window forecaster.
+  - Remaining roadmap items: classification head, regression head, hardware compile/quantize backends.
 
 ## Pending / Needs Definition
 
@@ -61,6 +62,12 @@
   - `src/tirex2/pro/hardware/detect.py`: added `cuda_home` detection from `CUDA_HOME`/`CUDA_PATH` and system fallback; report in `print_hardware_report`.
   - `src/tirex2/pro/hardware/__init__.py`: export `HardwareInfo` and `print_hardware_report`.
   - Added `test/test_pro_skeletons.py` with 10 tests; `make test` now passes 101 tests.
+- **[CLOSED]** Implement TiRex Pro streaming feature (2026-08-03)
+  - Implemented `IncrementalForecaster` as a rolling-window streaming wrapper.
+  - Accepts raw `TiRex2` or `ForecastModel`; wraps raw backbone in `ForecastModel` internally.
+  - Supports target + past/future covariates, truncates to `context_length`.
+  - Updated `test/test_pro_skeletons.py` with 4 streaming-specific tests.
+  - `make test` now passes 104 tests; `make lint` clean.
 
 ---
 
@@ -69,4 +76,5 @@
 - **2026-08-03 session start:** Context overfilled in prior session. User asked for regular summaries, compaction, and task tracking in `TASKS.md`.
 - **2026-08-03 mid-session:** Training/fine-tuning hardening: fixed default config mismatch, added dataset validation, verified CLI smoke test and full `pytest test/` pass.
 - **2026-08-03 end-session:** Packaging sanity and `make test` fixed. Fork created at `hysebsch/tirex-2`; both commits pushed. Pro skeletons hardened with tests. `make test` passes 101 tests; `make lint` clean.
+- **2026-08-03 streaming session:** Implemented `IncrementalForecaster` rolling-window streaming feature. `make test` passes 104 tests; pushed to fork.
 - **Important constraints from `CLAUDE.md`:** CUDA 12.8 torch on NVIDIA; DGX Spark CUDA 13.0 driver is backward-compatible via local toolkit; do not commit `model/`, `output/`, `.venv/`, `__pycache__/`, `*.csv`, `.pixi/`, `*.egg-info`; use `uv`, not Pixi.
