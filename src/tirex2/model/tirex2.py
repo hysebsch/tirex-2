@@ -249,6 +249,30 @@ class TiRex2(nn.Module):
 
     def forward(self, batch: dict[str, Any]) -> torch.Tensor | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         """Forward pass producing quantile predictions for all variates in batch."""
+        x, features = self.forward_features(batch)
+        x = self.output_patch_embedding(x)  # [B*V, L, D] -> [B*V, L, D_out]
+        x = torch.unflatten(x, -1, (self.num_quantiles, self.output_patch_size))  # [B*V, L, D_out] -> [B*V, L, Q, P]
+        x = torch.transpose(x, 1, 2)  # switch quantile and num_token_dimension  [B*V, L, Q, P] -> [B*V, Q, L, P]
+
+        # reverse tokenization and scaling
+        tokenizer_state = features["tokenizer_state"]
+        scaler_state = features["scaler_state"]
+        x = self.tokenizer.output_transform(x, tokenizer_state)  # [B*V, Q, L, P] -> [B*V, Q, T'], T' = T + padding
+        x = self.scaler.re_scale(x, scaler_state)
+
+        return x
+
+    def forward_features(self, batch: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
+        """Run the backbone up to the final stack output and return features.
+
+        Returns
+        -------
+        x : torch.Tensor
+            Normalized stack output of shape ``[B*V, L, embedding_dim]``.
+        info : dict
+            Dictionary containing ``tokenizer_state``, ``scaler_state``,
+            ``target_mask``, ``known_covariate_mask``, and ``group_vector``.
+        """
         x: torch.Tensor = batch["x"]
         group_vector: torch.Tensor | None = batch.get("group_vector", None)
         target_mask: torch.Tensor | None = batch.get("target_mask", None)
@@ -290,15 +314,14 @@ class TiRex2(nn.Module):
         x = self.stack_out_norm(x)
         x = nn.functional.dropout(x, self.dropout, training=self.training)
 
-        x = self.output_patch_embedding(x)  # [B*V, L, D] -> [B*V, L, D_out]
-        x = torch.unflatten(x, -1, (self.num_quantiles, self.output_patch_size))  # [B*V, L, D_out] -> [B*V, L, Q, P]
-        x = torch.transpose(x, 1, 2)  # switch quantile and num_token_dimension  [B*V, L, Q, P] -> [B*V, Q, L, P]
-
-        # reverse tokenization and scaling
-        x = self.tokenizer.output_transform(x, tokenizer_state)  # [B*V, Q, L, P] -> [B*V, Q, T'], T' = T + padding
-        x = self.scaler.re_scale(x, scaler_state)
-
-        return x
+        info = {
+            "tokenizer_state": tokenizer_state,
+            "scaler_state": scaler_state,
+            "target_mask": target_mask,
+            "known_covariate_mask": known_covariate_mask,
+            "group_vector": group_vector,
+        }
+        return x, info
 
     @torch.no_grad
     def predict(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+import torch.nn as nn
 
 from tirex2 import TimeseriesType
 from tirex2.pro.classification import TimeSeriesClassifier
@@ -155,10 +156,72 @@ def test_time_series_classifier_not_implemented(build_small_model) -> None:
         classifier.predict(None)
 
 
-def test_time_series_regressor_not_implemented(build_small_model) -> None:
-    model = build_small_model("cpu")
-    regressor = TimeSeriesRegressor(model, output_dim=2)
-    with pytest.raises(NotImplementedError, match="Regression training"):
-        regressor.fit([])
-    with pytest.raises(NotImplementedError, match="Regression prediction"):
-        regressor.predict(None)
+def test_time_series_regressor_smoke(build_small_model) -> None:
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    pred_len = model.future_len
+
+    regressor = TimeSeriesRegressor(model, output_dim=2, hidden_dim=32)
+    # Backbone should be frozen by default.
+    assert all(not p.requires_grad for p in regressor.model.parameters())
+    assert any(p.requires_grad for p in regressor.head.parameters())
+
+    # Build a few synthetic (series, target) pairs.
+    data = []
+    for i in range(4):
+        target = torch.randn(1, context_len)
+        future_cov = torch.zeros(1, context_len + pred_len)
+        ts = TimeseriesType(target=target, past_covariates=None, future_covariates=future_cov)
+        label = torch.tensor([[float(i), float(i) * 0.5]])  # [1, 2]
+        data.append((ts, label))
+
+    regressor.fit(data, epochs=2, batch_size=2, learning_rate=1e-3, context_length=context_len, log_interval=1)
+
+    pred = regressor.predict(data[0][0])
+    assert pred.shape == (1, 2)
+    assert torch.isfinite(pred).all()
+
+
+def test_time_series_regressor_predict_batch(build_small_model) -> None:
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    pred_len = model.future_len
+
+    regressor = TimeSeriesRegressor(model, output_dim=1, hidden_dim=16)
+    series = [
+        TimeseriesType(
+            target=torch.randn(1, context_len),
+            past_covariates=None,
+            future_covariates=torch.zeros(1, context_len + pred_len),
+        )
+        for _ in range(3)
+    ]
+    labels = [torch.tensor([[1.0]]), torch.tensor([[2.0]]), torch.tensor([[3.0]])]
+    regressor.fit(list(zip(series, labels)), epochs=1, batch_size=2, context_length=context_len)
+
+    preds = regressor.predict(series)
+    assert len(preds) == 3
+    for p in preds:
+        assert p.shape == (1, 1)
+        assert torch.isfinite(p).all()
+
+
+def test_time_series_regressor_save_load_head(build_small_model, tmp_path) -> None:
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    pred_len = model.future_len
+
+    regressor = TimeSeriesRegressor(model, output_dim=2, hidden_dim=16)
+    ts = TimeseriesType(
+        target=torch.randn(1, context_len),
+        past_covariates=None,
+        future_covariates=torch.zeros(1, context_len + pred_len),
+    )
+    regressor.fit([(ts, torch.tensor([[1.0, 2.0]]))], epochs=1, context_length=context_len)
+    pred_before = regressor.predict(ts)
+
+    regressor.save_head(tmp_path)
+    reloaded = TimeSeriesRegressor(model, output_dim=2, hidden_dim=16)
+    reloaded.load_head(tmp_path)
+    pred_after = reloaded.predict(ts)
+    assert torch.allclose(pred_before, pred_after, atol=1e-6)
