@@ -9,6 +9,7 @@
   - Core uv migration, training/fine-tuning hardening, and several Pro skeletons are implemented.
   - Streaming feature implemented as rolling-window forecaster.
   - Regression head implemented with frozen backbone + MLP head.
+  - Anomaly detector implemented using forecast-deviation scoring.
   - Remaining roadmap items: classification head, hardware compile/quantize backends.
 
 ## Pending / Needs Definition
@@ -74,6 +75,12 @@
   - Implemented `TimeSeriesRegressor` with a frozen-backbone MLP head, mean-pooled target features, masked MSE loss.
   - Supports `fit`, `predict`, `save_head`, `load_head`; added 3 regression tests.
   - `make test` passes 105+ tests; `make lint` clean. One pre-existing flaky GPU-only flex-attention timing test occasionally fails.
+- **[CLOSED]** Implement TiRex Pro anomaly detector (2026-08-03)
+  - Added `src/tirex2/pro/anomaly/` package: `TimeSeriesAnomalyDetector`, `AnomalyResult`, three scorers (`iqr_deviation`, `quantile_exceedance`, `crps_residual`).
+  - Uses rolling one-step-ahead quantile forecasts to score each observed time step.
+  - Threshold calibration via percentile or contamination rate on reference data.
+  - Exported from `tirex2.pro`; added `test/test_anomaly.py` with synthetic anomaly tests.
+  - `make test` passes 111 tests; `make lint` clean.
 
 ---
 
@@ -84,4 +91,5 @@
 - **2026-08-03 end-session:** Packaging sanity and `make test` fixed. Fork created at `hysebsch/tirex-2`; both commits pushed. Pro skeletons hardened with tests. `make test` passes 101 tests; `make lint` clean.
 - **2026-08-03 streaming session:** Implemented `IncrementalForecaster` rolling-window streaming feature. `make test` passes 104 tests; pushed to fork.
 - **2026-08-03 regression session:** Implemented `TimeSeriesRegressor`. `make test` passes 105+ tests; pushed to fork. Note: pre-existing flaky GPU-only flex-attention timing test may fail intermittently.
+- **2026-08-03 anomaly session:** Implemented `TimeSeriesAnomalyDetector` with forecast-deviation scoring and threshold calibration. `make test` passes 111 tests; pushed to fork.
 - **Important constraints from `CLAUDE.md`:** CUDA 12.8 torch on NVIDIA; DGX Spark CUDA 13.0 driver is backward-compatible via local toolkit; do not commit `model/`, `output/`, `.venv/`, `__pycache__/`, `*.csv`, `.pixi/`, `*.egg-info`; use `uv`, not Pixi.
