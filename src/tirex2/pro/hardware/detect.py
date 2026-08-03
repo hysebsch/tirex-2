@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import platform
 import shutil
 import subprocess
@@ -19,6 +20,7 @@ class HardwareInfo:
     has_gpu: bool
     gpu_names: list[str]
     driver_cuda_version: str | None
+    cuda_home: str | None
     recommended_device: str
     recommended_matmul_precision: str | None
 
@@ -28,6 +30,18 @@ def _run(cmd: list[str]) -> str | None:
         return subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
+
+
+def _detect_cuda_home() -> str | None:
+    """Return the active CUDA toolkit path from the environment if set."""
+    env_cuda = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
+    if env_cuda:
+        return env_cuda
+    # Fallback to common system locations.
+    for candidate in [Path("/usr/local/cuda")]:
+        if (candidate / "bin" / "nvcc").exists():
+            return str(candidate)
+    return None
 
 
 def detect_hardware() -> HardwareInfo:
@@ -57,6 +71,7 @@ def detect_hardware() -> HardwareInfo:
         has_gpu=has_gpu,
         gpu_names=gpu_names,
         driver_cuda_version=driver_cuda,
+        cuda_home=_detect_cuda_home(),
         recommended_device=recommended_device,
         recommended_matmul_precision=recommended_matmul,
     )
@@ -68,4 +83,5 @@ def print_hardware_report(info: HardwareInfo | None = None) -> None:
     print(f"Platform:        {info.platform} ({info.architecture})")
     print(f"GPU(s):          {', '.join(info.gpu_names) if info.gpu_names else 'none'}")
     print(f"Driver CUDA:     {info.driver_cuda_version or 'unknown'}")
+    print(f"CUDA_HOME:       {info.cuda_home or 'not set'}")
     print(f"Recommended:     device={info.recommended_device}, matmul={info.recommended_matmul_precision}")
