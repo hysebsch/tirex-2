@@ -18,6 +18,7 @@ dependencies = [
     "xlstm~=2.0.3",
     "PyYAML>=6",
     "huggingface-hub>=0.35.3",
+    "ipywidgets>=8.1.8",
 ]
 
 [project.optional-dependencies]

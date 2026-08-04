@@ -41,13 +41,19 @@ class TimeSeriesAnomalyDetector:
     prediction_length : int
         Forecast horizon used for scoring. For online point-level detection
         this is typically ``1``.
-    scorer : {"iqr_deviation", "quantile_exceedance", "crps_residual"}
-        Scoring function. ``iqr_deviation`` is the default.
+    scorer : {"iqr_deviation", "quantile_exceedance", "crps_residual", "trend_residual", "volatility_residual"}
+        Scoring function. ``iqr_deviation`` is the default. ``trend_residual``
+        and ``volatility_residual`` use a small rolling history of recent
+        normalized residuals, so they can detect sustained trend/level shifts
+        and volatility bursts that the pointwise scorers miss.
     aggregation : {"max", "mean"}
         How to aggregate per-variate scores into a global score.
     context_length : int | None
         Length of the rolling context window. ``None`` uses the model's
         ``context_len``.
+    local_window : int
+        Number of recent residuals used as the local baseline for
+        ``trend_residual`` and ``volatility_residual``.
 
     Examples
     --------
@@ -62,9 +68,16 @@ class TimeSeriesAnomalyDetector:
         model: Any,
         *,
         prediction_length: int = 1,
-        scorer: Literal["iqr_deviation", "quantile_exceedance", "crps_residual"] = "iqr_deviation",
+        scorer: Literal[
+            "iqr_deviation",
+            "quantile_exceedance",
+            "crps_residual",
+            "trend_residual",
+            "volatility_residual",
+        ] = "iqr_deviation",
         aggregation: Literal["max", "mean"] = "max",
         context_length: int | None = None,
+        local_window: int = 6,
     ) -> None:
         if isinstance(model, ForecastModel):
             self.model = model
@@ -77,6 +90,9 @@ class TimeSeriesAnomalyDetector:
 
         self.scorer_name = scorer
         self.aggregation = aggregation
+        self.local_window = int(local_window)
+        if self.local_window < 1:
+            raise ValueError(f"local_window must be >= 1, got {self.local_window}")
 
         model_context_len = getattr(self.model, "context_len", None)
         if context_length is not None:
@@ -90,7 +106,8 @@ class TimeSeriesAnomalyDetector:
             raise ValueError(f"context_length must be >= 1, got {self.context_length}")
 
         quantiles = getattr(self.model, "quantiles", torch.tensor([0.1, 0.5, 0.9]))
-        self._scorer = get_scorer(scorer, quantiles)
+        self._scorer = get_scorer(scorer, quantiles, window=self.local_window)
+        self._residual_history: torch.Tensor | None = None
         self.threshold: float | None = None
 
     def fit_threshold(
@@ -145,12 +162,28 @@ class TimeSeriesAnomalyDetector:
             target = target.unsqueeze(0)
 
         num_variates, total_length = target.shape
+        device = target.device
         per_variate_scores = torch.full(
             (num_variates, total_length),
             float("nan"),
             dtype=torch.float32,
-            device=target.device,
+            device=device,
         )
+
+        # Rolling buffer of signed normalized residuals for trend/volatility scorers.
+        # We keep up to local_window values; padding with NaN is fine for nanmean.
+        residual_history = torch.full(
+            (num_variates, self.local_window),
+            float("nan"),
+            dtype=torch.float32,
+            device=device,
+        )
+        hist_idx = 0
+
+        quantiles = getattr(self.model, "quantiles", torch.tensor([0.1, 0.5, 0.9]))
+        median_idx = self._find_quantile_index(quantiles, 0.5)
+        low_idx = self._find_quantile_index(quantiles, 0.1)
+        high_idx = self._find_quantile_index(quantiles, 0.9)
 
         # Score positions t = context_length ... total_length - 1 using a
         # one-step-ahead forecast from the preceding context_length steps.
@@ -158,8 +191,23 @@ class TimeSeriesAnomalyDetector:
             context = self._slice_context(timeseries, t - self.context_length, t)
             forecast = self._forecast_one_step(context)
             actual = target[..., t]
-            score = self._scorer(forecast, actual)  # [V]
+
+            # Update the residual history for the next call. Use normalized
+            # signed residual against the model's median / IQR.
+            median = forecast[:, median_idx]
+            iqr = (forecast[:, high_idx] - forecast[:, low_idx]).abs()
+            eps = 1e-6
+            robust_iqr = torch.where(iqr > eps, iqr, torch.full_like(iqr, eps))
+            residual = (actual - median) / robust_iqr
+
+            score = self._scorer(forecast, actual, residual_history)  # [V]
             per_variate_scores[..., t] = score
+
+            # Store residual and advance circular index.
+            residual_history[:, hist_idx % self.local_window] = residual
+            hist_idx += 1
+
+        self._residual_history = residual_history
 
         global_scores = self._aggregate(per_variate_scores)
         labels = self._label(global_scores, per_variate_scores)
@@ -183,6 +231,10 @@ class TimeSeriesAnomalyDetector:
         if self.threshold is None:
             raise RuntimeError("Threshold not set. Call fit_threshold() before predict().")
         return self.score(timeseries)
+
+    @staticmethod
+    def _find_quantile_index(quantiles: torch.Tensor, level: float) -> int:
+        return int((quantiles - level).abs().argmin().item())
 
     def _slice_context(
         self,
