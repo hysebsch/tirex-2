@@ -80,6 +80,11 @@
   - Added `examples/pro_features.ipynb` with CPU-friendly walkthroughs for streaming forecasting, regression head, and anomaly detection.
   - Matches the style of `examples/getting_started.ipynb`; uses matplotlib for static, CI-friendly plots.
   - Notebook validated with `nbformat.validate` and syntax-checked; Pro tests still pass.
+- **[CLOSED]** Extend anomaly detector with trend and volatility scorers (2026-08-03)
+  - Added `trend_residual` and `volatility_residual` scorers in `src/tirex2/pro/anomaly/scorers.py`.
+  - `TimeSeriesAnomalyDetector` now maintains a rolling signed normalized residual buffer and exposes `local_window`.
+  - Extended `examples/pro_features.ipynb` with trend/level-shift and volatility-burst subsections.
+  - Added `test/test_new_scorers.py`; Pro test suite (34 tests) passes; lint clean.
 
 ---
 
@@ -91,5 +96,6 @@
 - **2026-08-03 streaming session:** Implemented `IncrementalForecaster` rolling-window streaming feature. `make test` passes 104 tests; pushed to fork.
 - **2026-08-03 regression session:** Implemented `TimeSeriesRegressor`. `make test` passes 105+ tests; pushed to fork. Note: pre-existing flaky GPU-only flex-attention timing test may fail intermittently.
 - **2026-08-03 anomaly session:** Implemented `TimeSeriesAnomalyDetector` with forecast-deviation scoring and threshold calibration. `make test` passes 111 tests; pushed to fork.
+- **2026-08-03 anomaly-extension session:** Added `trend_residual` and `volatility_residual` scorers; extended `pro_features.ipynb`; Pro tests pass.
 - **Handoff (2026-08-03):** Work is on branch `main` of fork `hysebsch/tirex-2`, upstream `NX-AI/tirex-2`. Next choices: (1) implement `TimeSeriesClassifier`, (2) implement `HardwareOptimizer.compile/quantize`, (3) open PR to upstream, (4) validate `make install-cuda` on DGX Spark.
 - **Important constraints from `CLAUDE.md`:** CUDA 12.8 torch on NVIDIA; DGX Spark CUDA 13.0 driver is backward-compatible via local toolkit; do not commit `model/`, `output/`, `.venv/`, `__pycache__/`, `*.csv`, `.pixi/`, `*.egg-info`; use `uv`, not Pixi.
