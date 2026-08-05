@@ -31,8 +31,7 @@ def _build_volatility_burst_series(context_len, total_len, seed=6, burst_std: fl
     return y.unsqueeze(0)
 
 
-@pytest.mark.parametrize("scorer", ["trend_residual", "iqr_deviation"])
-def test_trend_scorer_flags_level_shift(build_small_model, scorer):
+def test_trend_residual_flags_level_shift(build_small_model):
     model = build_small_model("cpu").eval()
     context_len = model.context_len
     total_len = context_len + 80
@@ -51,7 +50,7 @@ def test_trend_scorer_flags_level_shift(build_small_model, scorer):
     detector = TimeSeriesAnomalyDetector(
         model,
         prediction_length=1,
-        scorer=scorer,
+        scorer="trend_residual",
         context_length=context_len,
         local_window=6,
     )
@@ -59,7 +58,37 @@ def test_trend_scorer_flags_level_shift(build_small_model, scorer):
     result = detector.predict(test)
 
     shift_flags = result.global_labels[context_len + 10 :]
-    assert shift_flags.any(), f"{scorer} should flag a level shift"
+    assert shift_flags.any(), "trend_residual should flag a level shift"
+
+
+def test_iqr_deviation_flags_level_shift(build_small_model):
+    model = build_small_model("cpu").eval()
+    context_len = model.context_len
+    total_len = context_len + 80
+
+    clean = TimeseriesType(
+        target=_build_step_shift_series(context_len, total_len, seed=10),
+        past_covariates=None,
+        future_covariates=torch.zeros(1, total_len),
+    )
+    test = TimeseriesType(
+        target=_build_step_shift_series(context_len, total_len, seed=5),
+        past_covariates=None,
+        future_covariates=torch.zeros(1, total_len),
+    )
+
+    detector = TimeSeriesAnomalyDetector(
+        model,
+        prediction_length=1,
+        scorer="iqr_deviation",
+        context_length=context_len,
+        local_window=6,
+    )
+    detector.fit_threshold([clean], percentile=99.0)
+    result = detector.predict(test)
+
+    shift_flags = result.global_labels[context_len + 10 :]
+    assert shift_flags.any(), "iqr_deviation should flag a level shift"
 
 
 def test_volatility_residual_flags_burst(build_small_model):
